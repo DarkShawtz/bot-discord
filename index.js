@@ -90,20 +90,74 @@ client.on(Events.MessageCreate, async (message) => {
         }
     }
 
-    // ===== MUTE =====
-    if (message.content.startsWith("!mute")) {
+// ===== MUTE =====
+if (message.content.startsWith("!mute")) {
 
-        if (!message.member.permissions.has("ModerateMembers"))
-            return message.reply("Você não tem permissão.");
+    if (!message.member.permissions.has("ModerateMembers"))
+        return message.reply("Você não tem permissão.");
 
-        const user = message.mentions.members.first();
-        if (!user) return message.reply("Marca alguém.");
+    const args = message.content.split(" ");
+    const user = message.mentions.members.first();
+    const time = args[2];
 
-        if (!user.moderatable) return message.reply("Não consigo mutar.");
+    if (!user || !time)
+        return message.reply("Use: !mute @user 10m / 2h / 1d");
 
-        await user.timeout(10 * 60 * 1000);
-        message.channel.send(`${user.user.tag} foi mutado por 10 minutos.`);
+    if (!user.moderatable)
+        return message.reply("Não consigo mutar.");
+
+    const unit = time.slice(-1);
+    const value = parseInt(time.slice(0, -1));
+
+    if (!value || !["m", "h", "d"].includes(unit))
+        return message.reply("Tempo inválido. Ex: 10m, 2h, 1d");
+
+    let ms;
+    if (unit === "m") ms = value * 60 * 1000;
+    if (unit === "h") ms = value * 60 * 60 * 1000;
+    if (unit === "d") ms = value * 24 * 60 * 60 * 1000;
+
+    await user.timeout(ms);
+
+    message.channel.send(`${user.user.tag} foi mutado por ${time}.`);
     }
+
+// ===== UNMUTE =====
+if (message.content.startsWith("!unmute")) {
+
+    if (!message.member.permissions.has("ModerateMembers"))
+        return message.reply("Sem permissão.");
+
+    const user = message.mentions.members.first();
+    if (!user) return message.reply("Marca alguém.");
+
+    await user.timeout(null);
+    message.channel.send(`${user.user.tag} desmutado.`);
+}
+
+    // ===== CLEAR =====
+if (message.content.startsWith("!clear")) {
+
+    if (!message.member.permissions.has("ManageMessages"))
+        return message.reply("Sem permissão.");
+
+    const args = message.content.split(" ");
+    const amount = parseInt(args[1]);
+
+    if (!amount || amount < 1 || amount > 1000)
+        return message.reply("Use um número entre 1 e 1000.");
+
+    let deleted = 0;
+
+    while (deleted < amount) {
+        const toDelete = Math.min(100, amount - deleted);
+        const msgs = await message.channel.bulkDelete(toDelete, true);
+        deleted += msgs.size;
+    }
+
+    message.channel.send(`🧹 Apaguei ${amount} mensagens.`)
+        .then(m => setTimeout(() => m.delete(), 3000));
+}
 
 });
 
