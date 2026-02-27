@@ -1,5 +1,7 @@
 require("dotenv").config();
 
+console.log("DEBUG: index.js iniciou");
+
 // ===== PORTA HTTP PRA RENDER =====
 const express = require("express");
 const app = express();
@@ -378,8 +380,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
 });
 
 // ===== LOGIN (com aviso se TOKEN não existir) =====
+console.log("DEBUG: Cheguei antes do login");
+console.log("DEBUG TOKEN existe?", !!process.env.TOKEN);
+
 if (!process.env.TOKEN) {
   console.log("❌ TOKEN não encontrado! Configure a variável TOKEN no Render (Environment Variables).");
 } else {
+  console.log("DEBUG: Vou tentar logar no Discord agora...");
   client.login(process.env.TOKEN);
 }
