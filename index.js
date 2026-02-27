@@ -36,8 +36,14 @@ const client = new Client({
   ]
 });
 
-// ===== LOGS IMPORTANTES (pra aparecer erro no Render) =====
+// ===== LOGS IMPORTANTES (Render / Gateway) =====
 client.on("error", (e) => console.log("CLIENT ERROR:", e));
+client.on("warn", (m) => console.log("WARN:", m));
+client.on("debug", (m) => console.log("DEBUG_WS:", m));
+client.on("shardError", (e) => console.log("SHARD ERROR:", e));
+client.on("shardDisconnect", (event, id) => console.log("SHARD DISCONNECT:", id, event));
+client.on("shardReconnecting", (id) => console.log("SHARD RECONNECTING:", id));
+
 process.on("unhandledRejection", (e) => console.log("UNHANDLED:", e));
 process.on("uncaughtException", (e) => console.log("UNCAUGHT:", e));
 
@@ -123,6 +129,13 @@ async function giveRoleIfNeeded(member, newLevel) {
 client.once(Events.ClientReady, (c) => {
   console.log(`✅ Bot ligado no Discord como ${c.user.tag}`);
 });
+
+// Se não logar em 30s, avisa (diagnóstico)
+setTimeout(() => {
+  if (!client.isReady()) {
+    console.log("⚠️ 30s e ainda não ficou READY. Isso geralmente é token errado, intents, ou bloqueio no gateway.");
+  }
+}, 30_000);
 
 client.on(Events.MessageCreate, async (message) => {
   if (message.author.bot) return;
@@ -379,13 +392,21 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 });
 
-// ===== LOGIN (com aviso se TOKEN não existir) =====
-console.log("DEBUG: Cheguei antes do login");
-console.log("DEBUG TOKEN existe?", !!process.env.TOKEN);
+// ===== LOGIN (com await + erro explícito) =====
+(async () => {
+  console.log("DEBUG: Cheguei antes do login");
+  console.log("DEBUG TOKEN existe?", !!process.env.TOKEN);
 
-if (!process.env.TOKEN) {
-  console.log("❌ TOKEN não encontrado! Configure a variável TOKEN no Render (Environment Variables).");
-} else {
-  console.log("DEBUG: Vou tentar logar no Discord agora...");
-  client.login(process.env.TOKEN);
-}
+  if (!process.env.TOKEN) {
+    console.log("❌ TOKEN não encontrado! Configure a variável TOKEN no Render (Environment Variables).");
+    return;
+  }
+
+  try {
+    console.log("DEBUG: Vou tentar logar no Discord agora...");
+    await client.login(process.env.TOKEN);
+    console.log("DEBUG: login() retornou.");
+  } catch (e) {
+    console.log("❌ ERRO no login:", e);
+  }
+})();
