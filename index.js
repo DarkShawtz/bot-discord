@@ -115,8 +115,8 @@ async function giveRoleIfNeeded(member, newLevel) {
   }
 }
 
-client.once("clientReady", () => {
-  console.log(`Bot ligado como ${client.user.tag}`);
+client.once(Events.ClientReady, (c) => {
+  console.log(` Bot ligado no Discord como ${c.user.tag}`);
 });
 
 client.on(Events.MessageCreate, async (message) => {
@@ -289,7 +289,36 @@ client.on(Events.MessageCreate, async (message) => {
     const need = xpNeeded(data.level);
     return message.reply(`📈 Nível de **${member.user.tag}**: **${data.level}** | XP: **${data.xp}/${need}**`);
   }
+// TOP 10
+if (content === "!top") {
+  const entries = Object.entries(levels)
+    .map(([id, data]) => ({
+      id,
+      level: data.level || 1,
+      xp: data.xp || 0
+    }))
+    .sort((a, b) => {
+      if (b.level === a.level) return b.xp - a.xp;
+      return b.level - a.level;
+    })
+    .slice(0, 10);
 
+  if (entries.length === 0)
+    return message.reply("Ainda não há ranking.");
+
+  let text = "🏆 **TOP 10 DO SERVIDOR** 🏆\n\n";
+
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
+    const member = await message.guild.members.fetch(e.id).catch(() => null);
+    const name = member ? member.user.tag : `User(${e.id})`;
+    text += `**${i + 1}.** ${name} — lvl **${e.level}** (xp ${e.xp})\n`;
+  }
+
+  await message.channel.send(text);
+  return;
+}
+  
   // não dar XP pra comandos
   if (content.startsWith("!")) return;
 
