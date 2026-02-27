@@ -34,6 +34,11 @@ const client = new Client({
   ]
 });
 
+// ===== LOGS IMPORTANTES (pra aparecer erro no Render) =====
+client.on("error", (e) => console.log("CLIENT ERROR:", e));
+process.on("unhandledRejection", (e) => console.log("UNHANDLED:", e));
+process.on("uncaughtException", (e) => console.log("UNCAUGHT:", e));
+
 // ===== LEVEL CONFIG =====
 const LEVELS_FILE = path.join(__dirname, "levels.json");
 
@@ -53,12 +58,10 @@ const SPAM_LIMIT = 5;
 const SPAM_MUTE_MS = 60_000;
 
 // memória (runtime)
-const lastXpTime = new Map();     // userId -> timestamp
-const msgTimes = new Map();       // userId -> array de timestamps
+const lastXpTime = new Map(); // userId -> timestamp
+const msgTimes = new Map();   // userId -> array de timestamps
 
 function xpNeeded(level) {
-  // simples de entender e bom: sobe gradualmente
-  // lvl 1->2: 100, lvl 2->3: 150, lvl 3->4: 200, etc
   return 50 + (level * 50);
 }
 
@@ -116,7 +119,7 @@ async function giveRoleIfNeeded(member, newLevel) {
 }
 
 client.once(Events.ClientReady, (c) => {
-  console.log(` Bot ligado no Discord como ${c.user.tag}`);
+  console.log(`✅ Bot ligado no Discord como ${c.user.tag}`);
 });
 
 client.on(Events.MessageCreate, async (message) => {
@@ -138,12 +141,9 @@ client.on(Events.MessageCreate, async (message) => {
     msgTimes.set(userId, filtered);
 
     if (filtered.length >= SPAM_LIMIT) {
-      // zera pra não ficar mutando em loop
       msgTimes.set(userId, []);
 
-      // tenta mutar
       try {
-        // só mute se o bot puder moderar e se a pessoa não for staff acima
         if (message.member && message.member.moderatable) {
           await message.member.timeout(SPAM_MUTE_MS, "Spam (5 mensagens em 3s)");
           await message.channel.send(`🚫 ${message.author} tomou mute de **1 minuto** por spam.`);
@@ -151,7 +151,7 @@ client.on(Events.MessageCreate, async (message) => {
       } catch (e) {
         console.log("Falha ao aplicar anti-spam mute:", e?.message || e);
       }
-      return; // para aqui
+      return;
     }
   }
 
@@ -289,36 +289,37 @@ client.on(Events.MessageCreate, async (message) => {
     const need = xpNeeded(data.level);
     return message.reply(`📈 Nível de **${member.user.tag}**: **${data.level}** | XP: **${data.xp}/${need}**`);
   }
-// TOP 10
-if (content === "!top") {
-  const entries = Object.entries(levels)
-    .map(([id, data]) => ({
-      id,
-      level: data.level || 1,
-      xp: data.xp || 0
-    }))
-    .sort((a, b) => {
-      if (b.level === a.level) return b.xp - a.xp;
-      return b.level - a.level;
-    })
-    .slice(0, 10);
 
-  if (entries.length === 0)
-    return message.reply("Ainda não há ranking.");
+  // TOP 10
+  if (content === "!top") {
+    const entries = Object.entries(levels)
+      .map(([id, data]) => ({
+        id,
+        level: data.level || 1,
+        xp: data.xp || 0
+      }))
+      .sort((a, b) => {
+        if (b.level === a.level) return b.xp - a.xp;
+        return b.level - a.level;
+      })
+      .slice(0, 10);
 
-  let text = "🏆 **TOP 10 DO SERVIDOR** 🏆\n\n";
+    if (entries.length === 0)
+      return message.reply("Ainda não há ranking.");
 
-  for (let i = 0; i < entries.length; i++) {
-    const e = entries[i];
-    const member = await message.guild.members.fetch(e.id).catch(() => null);
-    const name = member ? member.user.tag : `User(${e.id})`;
-    text += `**${i + 1}.** ${name} — lvl **${e.level}** (xp ${e.xp})\n`;
+    let text = "🏆 **TOP 10 DO SERVIDOR** 🏆\n\n";
+
+    for (let i = 0; i < entries.length; i++) {
+      const e = entries[i];
+      const member = await message.guild.members.fetch(e.id).catch(() => null);
+      const name = member ? member.user.tag : `User(${e.id})`;
+      text += `**${i + 1}.** ${name} — lvl **${e.level}** (xp ${e.xp})\n`;
+    }
+
+    await message.channel.send(text);
+    return;
   }
 
-  await message.channel.send(text);
-  return;
-}
-  
   // não dar XP pra comandos
   if (content.startsWith("!")) return;
 
@@ -333,8 +334,7 @@ if (content === "!top") {
 
   const data = ensureUser(message.author.id);
 
-  // XP aleatório 5–12 (leve)
-  const gained = Math.floor(Math.random() * 8) + 5;
+  const gained = Math.floor(Math.random() * 8) + 5; // 5-12
   data.xp += gained;
 
   let leveledUp = false;
@@ -349,7 +349,6 @@ if (content === "!top") {
   if (leveledUp) {
     await message.channel.send(`🔥 ${message.author} subiu para o **nível ${data.level}**!`);
 
-    // dá cargos por nível
     try {
       await giveRoleIfNeeded(message.member, data.level);
     } catch (e) {
@@ -378,4 +377,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
   }
 });
 
-client.login(process.env.TOKEN);
+// ===== LOGIN (com aviso se TOKEN não existir) =====
+if (!process.env.TOKEN) {
+  console.log("❌ TOKEN não encontrado! Configure a variável TOKEN no Render (Environment Variables).");
+} else {
+  client.login(process.env.TOKEN);
+}
